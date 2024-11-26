@@ -1,14 +1,17 @@
 package com.example.service;
 
-import com.example.dto.ApiResponse;
 import com.example.dto.StudentsDto;
+import com.example.repository.StudentRepository;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+@Autowired
+StudentRepository repository;
 
 @Service
 public class StudentService {
@@ -18,7 +21,8 @@ public class StudentService {
     private final Map<Integer, Map<String, Integer>> studentSubjects = new HashMap<>();
 
     public Map<String, Object> addStudent(StudentsDto studentDTO) {
-        validateStudentDto(studentDTO);
+//        validateStudentDto(studentDTO);
+
 
         if (isStudentExist(studentDTO.getId())) {
             log.warn("Student with ID {} already exists.", studentDTO.getId());
@@ -74,15 +78,14 @@ public class StudentService {
         studentInfo.put(studentDTO.getId(), studentDTO.getName());
     }
 
-    private void validateStudentDto(StudentsDto studentDTO) {
-
-
-    }
 
     private void validateSubjects(Map<String, Integer> subjects) {
         for (Map.Entry<String, Integer> entry : subjects.entrySet()) {
             if (entry.getValue() < 0  || entry.getValue() > 100) {
-                throw new IllegalArgumentException("Subject marks should be between 0 to 100 for " + entry.getKey());
+                throw new IllegalArgumentException("Please enter subject marks that should be between 0 to 100 for " + entry.getKey());
+            }
+            if(entry.getValue().describeConstable().isEmpty()){
+                 throw new IllegalArgumentException("Please the marks when you are adding subjects as well for" +entry.getKey());
             }
         }
     }

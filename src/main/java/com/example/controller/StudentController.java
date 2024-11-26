@@ -29,7 +29,7 @@ public class StudentController {
     public ResponseEntity<ApiResponse> addSubjects(@PathVariable int id, @RequestBody Map<String, Integer> subjects) {
         Map<String, Integer> updatedSubjects = studentService.addSubjects(id, subjects);
         return ResponseEntity.status(HttpStatus.OK)
-                .body(new ApiResponse(HttpStatus.OK.value(), "Subjects added/updated successfully", updatedSubjects));
+                .body(new ApiResponse(HttpStatus.OK.value(), "Subjects updated successfully", updatedSubjects));
     }
 
     @GetMapping("/all")
