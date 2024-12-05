@@ -2,60 +2,90 @@ package com.example.entity;
 
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
-
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Entity
+@Table(name = "STUDENT")
 public class Student {
 
-    
     @Id
-    private int id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @NotNull(message = "Student name must not be null")
-    @Size(min = 1, message = "Student name must not be empty")
-    private String name;
+    @Column(name = "first_name")
+    private String firstName;
 
-    @ElementCollection
-    @CollectionTable(name = "entity_map", joinColumns = @JoinColumn(name = "entity_id"))
-    @MapKeyColumn(name = "key_column")
-    @Column(name = "value_column")
-    private Map<String, Integer> subjects;
+    @Column(name = "last_name")
+    private String lastName;
 
-    Student(){}
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
 
-    public Student(int id, String name, Map<String, Integer> subjects) {
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Subject> subjects = new ArrayList<>();
 
-
-        this.id = id;
-        this.name = name;
-        this.subjects = subjects;
-    }
-
-    public int getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
     }
 
-    public Map<String, Integer> getSubjects() {
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public LocalDate getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
+    public List<Subject> getSubjects() {
         return subjects;
     }
 
-    public void setSubjects(Map<String, Integer> subjects) {
+    public void setSubjects(List<Subject> subjects) {
         this.subjects = subjects;
     }
+
+    public Map<String, Integer> getSubjectsMap() {
+        Map<String, Integer> subjectMap = new HashMap<>();
+        for (Subject subject : subjects) {
+            subjectMap.put(subject.getSubjectName(), subject.getMarks());
+        }
+        return subjectMap;
+    }
+
+    public void addOrUpdateSubject(String subjectName, int marks) {
+        for (Subject subject : subjects) {
+            if (subject.getSubjectName().equals(subjectName)) {
+                subject.setMarks(marks);
+                return;
+            }
+        }
+        Subject newSubject = new Subject(subjectName, marks, this); // pass the student reference
+        subjects.add(newSubject);
+    }
 }
+

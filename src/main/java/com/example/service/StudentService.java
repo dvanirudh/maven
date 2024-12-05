@@ -1,100 +1,113 @@
 package com.example.service;
 
+import com.example.entity.Student;
+import com.example.entity.Subject;
 import com.example.dto.StudentsDto;
 import com.example.repository.StudentRepository;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
-
-@Autowired
-StudentRepository repository;
 
 @Service
 public class StudentService {
-    private static final Logger log = LogManager.getLogger(StudentService.class);
 
-    private final Map<Integer, String> studentInfo = new HashMap<>();
-    private final Map<Integer, Map<String, Integer>> studentSubjects = new HashMap<>();
+    @Autowired
+    private StudentRepository studentRepository;
 
-    public Map<String, Object> addStudent(StudentsDto studentDTO) {
-//        validateStudentDto(studentDTO);
-
-
-        if (isStudentExist(studentDTO.getId())) {
-            log.warn("Student with ID {} already exists.", studentDTO.getId());
-            throw new IllegalArgumentException("Student with the given ID already exists.");
+    public StudentsDto addStudent(StudentsDto studentDTO) {
+        if (studentDTO == null || studentDTO.getSubjects() == null || studentDTO.getSubjects().isEmpty()) {
+            throw new IllegalArgumentException("Student data or subjects cannot be null or empty");
         }
 
-        addStudentInfo(studentDTO);
+            Student student = new Student();
+            student.setFirstName(studentDTO.getFirstName());
+            student.setLastName(studentDTO.getLastName());
+            student.setBirthDate(studentDTO.getBirthDate());
 
-        if (studentDTO.getSubjects() == null || studentDTO.getSubjects().isEmpty()) {
-            log.info("No subjects provided for student ID {}", studentDTO.getId());
-        } else {
-            addSubjects(studentDTO.getId(), studentDTO.getSubjects());
-        }
-
-        log.info("Student added successfully: ID={}, Name={}", studentDTO.getId(), studentDTO.getName());
-
-        return buildStudentDetails(studentDTO.getId(), studentDTO.getName(), studentDTO.getSubjects());
-    }
-
-    public Map<String, Integer> addSubjects(int id, Map<String, Integer> subjects) {
-        if (!isStudentExist(id)) {
-            log.warn("Student with ID {} does not exist.", id);
-            throw new IllegalArgumentException("Student with the given ID does not exist.");
-        }
-
-        if (subjects == null || subjects.isEmpty()) {
-            log.warn("Subjects cannot be null or empty for student with ID {}", id);
-            throw new IllegalArgumentException("Subjects cannot be null or empty.");
-        }
-
-        validateSubjects(subjects);
-
-        log.info("Adding subjects for student ID: {}", id);
-        studentSubjects.merge(id, subjects, (oldSubjects, newSubjects) -> {
-            oldSubjects.putAll(newSubjects);
-            return oldSubjects;
-        });
-
-        return studentSubjects.get(id);
-    }
-
-    public List<Map<String, Object>> getAllStudents() {
-        return studentInfo.entrySet().stream()
-                .map(entry -> buildStudentDetails(entry.getKey(), entry.getValue(), studentSubjects.get(entry.getKey())))
-                .collect(Collectors.toList());
-    }
-
-    private boolean isStudentExist(int id) {
-        return studentInfo.containsKey(id);
-    }
-
-    private void addStudentInfo(StudentsDto studentDTO) {
-        studentInfo.put(studentDTO.getId(), studentDTO.getName());
-    }
-
-
-    private void validateSubjects(Map<String, Integer> subjects) {
-        for (Map.Entry<String, Integer> entry : subjects.entrySet()) {
-            if (entry.getValue() < 0  || entry.getValue() > 100) {
-                throw new IllegalArgumentException("Please enter subject marks that should be between 0 to 100 for " + entry.getKey());
+            Map<String, Integer> subjects = studentDTO.getSubjects();
+            for (Map.Entry<String, Integer> entry : subjects.entrySet()) {
+                Subject subject = new Subject();
+                subject.setSubjectName(entry.getKey());
+                subject.setMarks(entry.getValue());
+                subject.setStudent(student);
+                student.getSubjects().add(subject);
             }
-            if(entry.getValue().describeConstable().isEmpty()){
-                 throw new IllegalArgumentException("Please the marks when you are adding subjects as well for" +entry.getKey());
-            }
-        }
+
+            student = studentRepository.save(student);
+
+            return convertToDTO(student);
+
     }
 
-    private Map<String, Object> buildStudentDetails(int id, String name, Map<String, Integer> subjects) {
-        Map<String, Object> studentDetails = new HashMap<>();
-        studentDetails.put("id", id);
-        studentDetails.put("name", name);
-        studentDetails.put("subjects", subjects == null || subjects.isEmpty() ? "N/A" : subjects);
-        return studentDetails;
+  
+    public List<StudentsDto> getAllStudents() {
+            System.out.println("Its running on cache");
+            List<Student> students = studentRepository.findAll();
+            if (students.isEmpty()) {
+                throw new RuntimeException("No students found");
+            }
+
+            List<StudentsDto> studentDTOs = new ArrayList<>();
+            for (Student student : students) {
+                studentDTOs.add(convertToDTO(student));
+            }
+            return studentDTOs;
+
+    }
+
+    public Map<String, Integer> updateStudent(Long studentId, Map<String, Integer> subjectsMap) {
+        if (studentId == null || subjectsMap == null || subjectsMap.isEmpty()) {
+            throw new IllegalArgumentException("Student ID or subjects map cannot be null or empty");
+        }
+
+            Student existingStudent = studentRepository.findById(studentId)
+                    .orElseThrow(() -> new RuntimeException("Student not found with id: " + studentId));
+
+            for (Map.Entry<String, Integer> entry : subjectsMap.entrySet()) {
+                String subjectName = entry.getKey();
+                int marks = entry.getValue();
+
+                Optional<Subject> existingSubject = existingStudent.getSubjects().stream()
+                        .filter(subject -> subject.getSubjectName().equals(subjectName))
+                        .findFirst();
+
+                if (existingSubject.isPresent()) {
+                    existingSubject.get().setMarks(marks);
+                } else {
+                    Subject newSubject = new Subject();
+                    newSubject.setSubjectName(subjectName);
+                    newSubject.setMarks(marks);
+                    newSubject.setStudent(existingStudent);
+                    existingStudent.getSubjects().add(newSubject);
+                }
+            }
+
+            studentRepository.save(existingStudent);
+
+            Map<String, Integer> updatedSubjects = new LinkedHashMap<>();
+            for (Subject subject : existingStudent.getSubjects()) {
+                updatedSubjects.put(subject.getSubjectName(), subject.getMarks());
+            }
+
+            return updatedSubjects;
+
+    }
+
+    public StudentsDto convertToDTO(Student student) {
+        StudentsDto dto = new StudentsDto();
+        dto.setId(student.getId());
+        dto.setFirstName(student.getFirstName());
+        dto.setLastName(student.getLastName());
+        dto.setBirthDate(student.getBirthDate());
+
+        Map<String, Integer> subjectMap = new LinkedHashMap<>();
+        for (Subject subject : student.getSubjects()) {
+            subjectMap.put(subject.getSubjectName(), subject.getMarks());
+        }
+        dto.setSubjects(subjectMap);
+
+        return dto;
     }
 }

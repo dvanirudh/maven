@@ -1,0 +1,11 @@
+{
+
+    "firstName": "John",
+    "lastName": "Wick",
+    "birthDate": "2023-12-02",
+    "subjects": {
+        "History": 78,
+        "Science": 65,
+        "Maths": 54
+    }
+}
